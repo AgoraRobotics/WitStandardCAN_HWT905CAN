@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# -*- coding:utf-8 -*-
+#!/usr/bin/env python3
 import serial
 import struct
 import rclpy
@@ -15,14 +14,31 @@ from std_msgs.msg import String
 from tf_transformations import quaternion_from_euler
 
 
+readreg = 0
+key = 0
+flag = 0
+iapflag = 0
+global recordflag
+buff = {}
+calibuff = list()
+global recordbuff
+angularVelocity = [0, 0, 0]
+acceleration = [0, 0, 0]
+magnetometer = [0, 0, 0]
+angle_degree = [0, 0, 0]
+mag_offset = [0, 0, 0]
+mag_range = [0, 0, 0]
+global wt_imu
+baudlist = [4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800]
+
 # Find ttyUSB* devices
-def find_ttyUSB():
-    print('The default serial port of the imu is /dev/ttyUSB0, if multiple serial port devices are identified, modify the serial port corresponding to the imu in the launch file')
+def find_ttyUSB(self):
+    self.get_logger().info('The default serial port of the imu is /dev/ttyUSB0, if multiple serial port devices are identified, modify the serial port corresponding to the imu in the launch file')
     
     posts = [port.device for port in serial.tools.list_ports.comports()
              if 'USB' in port.device]
     
-    print('There are {} {} serial port devices connected to the current PC: {}'.format(
+    self.get_logger().info('There are {} {} serial port devices connected to the current PC: {}'.format(
         len(posts), 'USB', posts))
 
 # Convert hexadecimal to ieee floating point number
@@ -30,7 +46,7 @@ def hex_to_short(raw_data):
     return list(struct.unpack("hhh", bytearray(raw_data)))
 
 # Process serial port data
-def handleSerialData(raw_data):
+def handleSerialData(self, raw_data):
     global buff, key, angle_degree, magnetometer, acceleration, angularVelocity, pub_flag, readreg, calibuff, flag, mag_offset, mag_range
     global angle_tip
     angle_flag = False
@@ -74,7 +90,7 @@ def handleSerialData(raw_data):
             else:
                 mag_range = readval
 
-            print(readval)
+            self.get_logger().info(readval)
 
         else:
             # print("This data processing class does not provide the parsing of " + str(buff[1]) + "")
@@ -86,7 +102,7 @@ def handleSerialData(raw_data):
         key = 0
         if angle_flag == True:
 
-            stamp = rospy.get_rostime()
+            stamp = self.get_clock().now().to_msg()
 
             imu_msg.header.stamp = stamp
             imu_msg.header.frame_id = "base_link"
@@ -121,31 +137,13 @@ def handleSerialData(raw_data):
             angle_tip = 0
 
 
-readreg = 0
-key = 0
-flag = 0
-iapflag = 0
-global recordflag
-buff = {}
-calibuff = list()
-global recordbuff
-angularVelocity = [0, 0, 0]
-acceleration = [0, 0, 0]
-magnetometer = [0, 0, 0]
-angle_degree = [0, 0, 0]
-mag_offset = [0, 0, 0]
-mag_range = [0, 0, 0]
-global wt_imu
-baudlist = [4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800]
-
-
-def recordThread():
+def recordThread(self):
     global recordflag, recordbuff
     recordflag = 1
     recordbuff = ''
     recordname = time.strftime("%Y%m%d%H%M%S", time.localtime()) + '.txt'
     fd = open(recordname, 'w+')
-    print('begin recording file name is {}'.format(recordname))
+    self.get_logger().info('begin recording file name is {}'.format(recordname))
     while recordflag:
         if len(recordbuff):
             fd.write(recordbuff)
@@ -154,10 +152,10 @@ def recordThread():
             time.sleep(1)
 
     fd.close()
-    print("stop recording")
+    self.get_logger().info("stop recording")
 
 
-def callback(data):
+def callback(self, data):
     global readreg, flag, calibuff, wt_imu, iapflag, mag_offset, mag_range, version, recordflag, baudlist
     unlock_imu_cmd = b'\xff\xaa\x69\x88\xb5'
     reset_magx_offset_cmd = b'\xff\xaa\x0b\x00\x00'
@@ -172,8 +170,8 @@ def callback(data):
     reset_mag_param_cmd = b'\xff\xaa\x01\x07\x00'
     set_rsw_demo_cmd = b'\xff\xaa\x02\x1f\x00'  # output time acc gyro angle mag
 
-    print('callback')
-    print(data)
+    self.get_logger().info('callback')
+    self.get_logger().info(data)
     if "mag" in data.data:
         wt_imu.write(unlock_imu_cmd)
         time.sleep(0.1)
@@ -206,7 +204,7 @@ def callback(data):
         wt_imu.write(read_mag_range_cmd)
         time.sleep(1)
         datalen = len(calibuff)
-        print('cali data {}'.format(datalen))
+        self.get_logger().info('cali data {}'.format(datalen))
         r = list()
         if datalen > 0:
             for i in range(datalen):
@@ -219,13 +217,13 @@ def callback(data):
             sumval = sum(r)
             r_n = float(sumval)/datalen
             if r_n < 0.05:
-                print('magnetic field calibration results are very good')
+                self.get_logger().info('magnetic field calibration results are very good')
             elif r_n < 0.1:
-                print('magnetic field calibration results are good')
+                self.get_logger().info('magnetic field calibration results are good')
             else:
-                print('magnetic field calibration results is bad, please try again')
+                self.get_logger().info('magnetic field calibration results is bad, please try again')
     elif "version" in data.data:
-        print('sensor version is {}'.format(version))
+        self.get_logger().info('sensor version is {}'.format(version))
     elif "begin" in data.data:
         record_thread = threading.Thread(target=recordThread)
         record_thread.start()
@@ -238,7 +236,7 @@ def callback(data):
             rate = float(val)
             for i in range(len(ratelist)):
                 if rate == ratelist[i]:
-                    print('chage {} rate'.format(rate))
+                    self.get_logger().info('chage {} rate'.format(rate))
                     val = i + 1
                     cmd = bytearray(5)
                     cmd[0] = 0xff
@@ -250,7 +248,7 @@ def callback(data):
                     time.sleep(0.1)
                     wt_imu.write(cmd)
         except Exception as e:
-            print(e)
+            self.get_logger().info(e)
     elif "baud" in data.data:
         try:
             val = data.data[4:]
@@ -270,7 +268,7 @@ def callback(data):
                     time.sleep(0.1)
                     wt_imu.baudrate = baud
         except Exception as e:
-            print(e)
+            self.get_logger().info(e)
     elif "rsw" in data.data:
         wt_imu.write(unlock_imu_cmd)
         time.sleep(0.1)
@@ -278,12 +276,12 @@ def callback(data):
         time.sleep(0.1)
 
 
-def thread_job():
-    print("thread run")
+def thread_job(self):
+    self.get_logger().info("thread run")
     rclpy.spin_once(node)
 
 
-def AutoScanSensor():
+def AutoScanSensor(self):
     global wt_imu, baudlist
     try:
         for baud in baudlist:
@@ -300,26 +298,25 @@ def AutoScanSensor():
                     if val[i] == 0x55:
                         sumval = sum(val[i:i+10])
                         if sumval == val[i+10]:
-                            print('{} baud find sensor'.format(baud))
+                            self.get_logger().info('{} baud find sensor'.format(baud))
                             return
 
     except Exception as e:
-        print("exception:" + str(e))
-        print("imu loss of connection, poor contact, or broken wire")
+        self.get_logger().info("exception:" + str(e))
+        self.get_logger().info("imu loss of connection, poor contact, or broken wire")
         exit(0)
 
 
 if __name__ == "__main__":
-    global recordflag, recordbuff, wt_imu
+    
     recordflag = 0
     recordbuff = list()
     wt_imu = serial.Serial()
     python_version = platform.python_version()[0]
 
-    find_ttyUSB()
-    
     rclpy.init()
     node = rclpy.create_node('imu')
+    find_ttyUSB(self=node)
     
     node.declare_parameter("port", "/dev/ttyUSB0")
     node.declare_parameter("baud", 230400)
@@ -327,14 +324,14 @@ if __name__ == "__main__":
     port = node.get_parameter("port").value
     baudrate = node.get_parameter("baud").value
     
-    print("IMU Type: HCAN Port:%s baud:%d" % (port, baudrate))
+    node.get_logger().info("IMU Type: HCAN Port:%s baud:%d" % (port, baudrate))
     
     imu_msg = Imu()
     mag_msg = MagneticField()
     
-    subscription = node.create_subscription(String, '/wit/cali', callback, 10)
+    subscription = node.create_subscription(String, '/wit/cali', self.callback, 10)
     
-    add_thread = threading.Thread(target=thread_job)
+    add_thread = threading.Thread(target=thread_job(self=node))
     add_thread.start()
     
     try:
@@ -345,7 +342,7 @@ if __name__ == "__main__":
             wt_imu.open()
             node.get_logger().info("\033[32mSerial port enabled successfully...\033[0m")
     except Exception as e:
-        print(e)
+        node.get_logger().info(e)
         node.get_logger().info("\033[31mFailed to open the serial port\033[0m")
         exit(0)
     else:
@@ -366,7 +363,7 @@ if __name__ == "__main__":
                     for i in range(0, buff_count):
                         handleSerialData(buff_data[i])
             except Exception as e:
-                print("exception:" + str(e))
-                print("imu loss of connection, poor contact, or broken wire")
+                node.get_logger().info("exception:" + str(e))
+                node.get_logger().info("imu loss of connection, poor contact, or broken wire")
                 exit(0)
     rclpy.shutdown()
