@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<package>
+<package format="3">
   <name>wit_ros_imu</name>
   <version>0.1.0</version>
   <description>The wit_ros_imu package</description>
@@ -10,17 +10,13 @@
   <url type="bugtracker">http://www.wit-motion.cn</url>
   <author email="kevin@wit-motion.com">kevin</author>
 
-  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <build_depend>roscpp</build_depend>
-  <build_depend>rospy</build_depend>
-  <build_depend>std_msgs</build_depend>
-
-  <run_depend>roscpp</run_depend>
-  <run_depend>rospy</run_depend>
-  <run_depend>std_msgs</run_depend>
+  <depend>rclcpp</depend>
+  <depend>rclpy</depend>
+  <depend>std_msgs</depend>
 
   <export>
-
+    <build_type>ament_cmake</build_type>
   </export>
 </package>
