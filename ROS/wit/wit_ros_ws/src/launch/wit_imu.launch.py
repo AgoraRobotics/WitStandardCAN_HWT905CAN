@@ -15,7 +15,7 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='wit_ros_imu',
-            executable='wit_can_ros.py', # change this to wit_normal_ros.py, wit_modbus_ros.py, wit_hmodbus_ros.py, wit_hcan_ros.py
+            executable='wit_can_ros2.py', # change this to wit_normal_ros.py, wit_modbus_ros.py, wit_hmodbus_ros.py, wit_hcan_ros.py
             name='imu',
             output='screen',
             parameters=[
